@@ -1,0 +1,18 @@
+Temporary secret: 9012e073fb02c51dc28aa1a7462f057d1254ed01
+2023/09/28 05:00:50 Main: Starting DNS Server at 53
+2023/09/28 05:00:50 HTTP: starting HTTP Websockets/Proxy Server on :3129
+2023/09/28 05:00:50 HTTP: starting HTTP Server on :8080
+2023/09/28 05:00:50 HTTP: starting HTTP Server on :8081
+2023/09/28 05:00:50 HTTP: starting HTTP Server on :8082
+2023/09/28 05:01:01 DNS: Received A query: dnsbind.haihao.info. from: 172.68.117.46:55330
+2023/09/28 05:01:01 DNS: response: dnsbind.haihao.info. 0 IN A 45.32.34.210 dnsbind.haihao.info.
+2023/09/28 05:04:13 HTTP: GET http://proxychecker.vultr.com/ from 173.199.117.55:48034
+Temporary secret: 00cff794cd6ae20bb7d41103a1aef5fa37000e26
+2023/09/28 05:05:10 Main: Starting DNS Server at 53
+2023/09/28 05:05:10 HTTP: starting HTTP Websockets/Proxy Server on :3129
+2023/09/28 05:05:10 HTTP: starting HTTP Server on :8080
+2023/09/28 05:05:10 HTTP: starting HTTP Server on :8081
+2023/09/28 05:05:10 HTTP: starting HTTP Server on :8082
+2023/09/28 05:18:36 HTTP: GET / from 141.98.11.44:55813
+2023/09/28 05:21:49 HTTP: GET /manager.html from 37.128.246.37:30169
+2023/09/28 05:21:50 HTTP: GET /favicon.ico from 37.128.246.37:6291

